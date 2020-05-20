@@ -2,7 +2,7 @@
 Available Commands
 .getqr
 .makeqr <long text to include>"""
-#requires qrcode
+# requires: qrcode
 from telethon import events
 import asyncio
 from datetime import datetime
