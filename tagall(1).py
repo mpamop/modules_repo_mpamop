@@ -14,7 +14,7 @@ def chunks(lst, n):
 
 class TagAllMod(loader.Module):
     def __init__(self):
-        self.config = loader.ModuleConfig("DEFAULT_MENTION_MESSAGE", "Так блэт!", "Default message of mentions")
+        self.config = loader.ModuleConfig("DEFAULT_MENTION_MESSAGE", "Так блин!", "Default message of mentions")
         self.name = "TagAll"
         
     async def client_ready(self, client, db):
