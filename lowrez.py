@@ -62,10 +62,12 @@ class VideoProcessorMod(loader.Module):
         subprocess.run(['ffmpeg', '-i', video_path, '-vn', '-ar', '44100', '-ac', '1', '-b:a', '8k', '-f', 'mp3', output_audio_path])
         
         # Обработка кадров
+        await message.edit("lowrezing...")
         subprocess.run(['jpegoptim', '-o', '-m0', '--strip-all', os.path.join(frames_dir, '*.jpg')])
     
 
         # Обработка видео
+        await message.edit("Scetching...")
         output_video_path = os.path.splitext(video_path)[0] + '_processed.mp4'
         subprocess.run(['ffmpeg', '-framerate', '30', '-i', os.path.join(frames_dir, 'frame%d.jpg'),
                     '-i', output_audio_path,'-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '17', '-preset', 'veryslow', output_video_path])
