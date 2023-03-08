@@ -62,6 +62,7 @@ class VideoProcessorMod(loader.Module):
         subprocess.run(['ffmpeg', '-i', video_path, '-vn', '-ar', '44100', '-ac', '1', '-b:a', '8k', '-f', 'mp3', output_audio_path])
         
         # Обработка кадров
+        await message.edit("Lowrezing...")
         for filename in os.listdir(frames_dir):
             if filename.endswith('.jpg'):
                 filepath = os.path.join(frames_dir, filename)
