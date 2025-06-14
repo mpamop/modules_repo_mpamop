@@ -28,13 +28,14 @@ class VoiceReplyMod(loader.Module):
 
                 # Подписываемся на событие нового сообщения от бота
                 event = self.client.loop.create_future()
-                self.client.add_event_handler(lambda e: event.set_result(e), events.NewMessage(from_users='smartspeech_sber_bot', incoming=True))
+                handler = lambda e: event.set_result(e)
+                self.client.add_event_handler(handler, events.NewMessage(from_users='smartspeech_sber_bot', incoming=True))
 
                 # Ожидаем ответа от бота
                 response = await event
 
                 # Удаляем обработчик события
-                self.client.remove_event_handler(event)
+                self.client.remove_event_handler(handler)
 
                 # Получаем ответ бота в виде текста
                 text = response.text
