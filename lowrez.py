@@ -4,6 +4,7 @@ import os
 import asyncio
 import logging
 import subprocess
+import tempfile
 
 from telethon import types, functions
 from telethon.errors.rpcerrorlist import RPCError
@@ -44,62 +45,44 @@ class VideoProcessorMod(loader.Module):
             return
 
         # Создание временной директории для работы с файлами
-        tempdir = "tempdir"
-        os.makedirs(tempdir, exist_ok=True)
+        with tempfile.TemporaryDirectory() as tempdir:
 
-        # Скачивание видеофайла во временную директорию
-        video_path = f"{tempdir}/{video.id}.{video.mime_type.split('/')[1]}"
-        await message.edit("Downloading video...")
-        await reply.download_media(file=video_path)
-        logger.info(f"Video downloaded to {video_path}")
+            # Скачивание видеофайла во временную директорию
+            video_path = f"{tempdir}/{video.id}.{video.mime_type.split('/')[1]}"
+            await message.edit("Downloading video...")
+            await reply.download_media(file=video_path)
+            logger.info(f"Video downloaded to {video_path}")
+            
+            # Разбор видео на фреймы
+            frames_dir = os.path.join(tempdir, 'frames')
+            if not os.path.exists(frames_dir):
+                os.makedirs(frames_dir)
+            output_audio_path = os.path.splitext(video_path)[0]
+            subprocess.run(['ffmpeg', '-i', video_path, os.path.join(frames_dir, 'frame%d.jpg')])
+            subprocess.run(['ffmpeg', '-i', video_path, '-vn', '-ar', '44100', '-ac', '1', '-b:a', '8k', '-f', 'mp3', output_audio_path])
+            
+            # Обработка кадров
+            await message.edit("Lowrezing...")
+            for filename in os.listdir(frames_dir):
+                if filename.endswith('.jpg'):
+                    filepath = os.path.join(frames_dir, filename)
+                    subprocess.run(['jpegoptim', '--strip-all', '-m0', '-o', filepath])
         
-        # Разбор видео на фреймы
-        frames_dir = os.path.join(tempdir, 'frames')
-        if not os.path.exists(frames_dir):
-            os.makedirs(frames_dir)
-        output_audio_path = os.path.splitext(video_path)[0]
-        subprocess.run(['ffmpeg', '-i', video_path, os.path.join(frames_dir, 'frame%d.jpg')])
-        subprocess.run(['ffmpeg', '-i', video_path, '-vn', '-ar', '44100', '-ac', '1', '-b:a', '8k', '-f', 'mp3', output_audio_path])
-        
-        # Обработка кадров
-        await message.edit("Lowrezing...")
-        for filename in os.listdir(frames_dir):
-            if filename.endswith('.jpg'):
-                filepath = os.path.join(frames_dir, filename)
-                subprocess.run(['jpegoptim', '--strip-all', '-m0', '-o', filepath])
     
-
-        # Обработка видео
-        await message.edit("Scetching...")
-        output_video_path = os.path.splitext(video_path)[0] + '_processed.mp4'
-        subprocess.run(['ffmpeg', '-framerate', '30', '-i', os.path.join(frames_dir, 'frame%d.jpg'),
-                    '-i', output_audio_path,'-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '17', '-preset', 'veryslow', output_video_path])
-        logger.info(f"Video processed, saved to {output_video_path}")
-
-        # Отправка обработанного видео в телеграм
-        await message.edit("Uploading video...")
-        try:
-            await message.client.send_file(message.to_id, output_video_path, attributes=[DocumentAttributeVideo(0, 0, 0, 0)])
-        except RPCError as e:
-            logger.error(f"Failed to send processed video: {e}")
-            await message.edit("Failed to send processed video")
-            return
-
-        # Удаление временных файлов
-        os.remove(video_path)
-        os.remove(output_video_path)
-        os.remove(output_audio_path)
-        folder_path = frames_dir
-        for filename in os.listdir(folder_path):
-            file_path = os.path.join(folder_path, filename)
+            # Обработка видео
+            await message.edit("Scetching...")
+            output_video_path = os.path.splitext(video_path)[0] + '_processed.mp4'
+            subprocess.run(['ffmpeg', '-framerate', '30', '-i', os.path.join(frames_dir, 'frame%d.jpg'),
+                        '-i', output_audio_path,'-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '17', '-preset', 'veryslow', output_video_path])
+            logger.info(f"Video processed, saved to {output_video_path}")
+    
+            # Отправка обработанного видео в телеграм
+            await message.edit("Uploading video...")
             try:
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    os.rmdir(file_path)
-            except Exception as e:
-                print(f'Failed to delete {file_path}. Reason: {e}')
-        os.rmdir(folder_path)
-        os.rmdir(tempdir)
+                await message.client.send_file(message.to_id, output_video_path, attributes=[DocumentAttributeVideo(0, 0, 0, 0)])
+            except RPCError as e:
+                logger.error(f"Failed to send processed video: {e}")
+                await message.edit("Failed to send processed video")
+                return
 
         await message.edit("Done!")
